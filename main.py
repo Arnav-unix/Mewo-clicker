@@ -1,6 +1,8 @@
 import pygame as py
 from pygame import mixer
 from button import Button
+import tomllib
+import tomli_w
 from math import sin
 import random as rd
 import time
@@ -11,8 +13,40 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 py.init()
 mixer.init()
 
-# Window settings
+# Save system
 
+save_file = "save.toml"
+
+
+def save_game(data):
+    with open(save_file, "wb") as file:
+        tomli_w.dump(data, file)
+
+
+def load_game():
+    if os.path.exists(save_file):
+        try:
+            with open(save_file, "rb") as file:
+                return tomllib.load(file)
+        except (OSError, tomllib.TOMLDecodeError):
+            pass
+
+    return {
+        "money": 0,
+        "cps": 0,
+        "mewoPOWER": 0,
+        "hand_amount": 0,
+        "slavemewo_amount": 0,
+        "sword_amount": 0,
+        "fish_amount": 0,
+        "pig_amount": 0,
+        "butterfly_amount": 0,
+    }
+
+
+save = load_game()
+
+# Window settings
 
 screen = py.display.set_mode((0, 0))
 width, height = screen.get_size()
@@ -54,7 +88,7 @@ fps = 60
 clock = py.time.Clock()
 
 # player
-mewoPOWER = 1
+mewoPOWER = save["mewoPOWER"]
 mewoHOVER = False
 mewoX = width / 2
 mewoY = height / 2
@@ -113,7 +147,7 @@ def human_format(num):
 # money
 moneyX = width / 2
 moneyY = height * 0.13
-money = 0
+money = save["money"]
 
 
 font_cache = {}
@@ -169,21 +203,22 @@ def store_pos(index):
     )
 
 
-cps = 0
+cps = save["cps"]
 
 
 # item class
 class item:
-    def __init__(self, image, price, power, pos):
+    def __init__(self, name, image, price, power, amount, pos):
         global buyIMG
         global pr_buyIMG
         self.X = pos[0]
         self.Y = pos[1]
         self.baseY = pos[1]
+        self.name = name
         self.image = image
         self.price = price
         self.power = power
-        self.amount = 0
+        self.amount = amount
         self.button = Button(0, 0, buyIMG, pr_buyIMG, STORE_ICON / 120)
 
     def handle(self, scr, events=()):
@@ -237,65 +272,77 @@ class item:
 # store items
 # hand
 hand = item(
+    "hand",
     py.transform.scale(
         py.image.load("Assets/store items/hand.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
     25,
     0.2,
+    save["hand_amount"],
     store_pos(0),
 )
 
 # slave mewo
 slavemewo = item(
+    "slavemewo",
     py.transform.scale(
         py.image.load("Assets/store items/slave mewo.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
     125,
     2,
+    save["slavemewo_amount"],
     store_pos(1),
 )
 
 # sword
 sword = item(
+    "sword",
     py.transform.scale(
         py.image.load("Assets/store items/sword.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
     750,
     10,
+    save["sword_amount"],
     store_pos(2),
 )
 
 # fish
 fish = item(
+    "fish",
     py.transform.scale(
         py.image.load("Assets/store items/fish.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
     4000,
     50,
+    save["fish_amount"],
     store_pos(3),
 )
 
 # pig
 pig = item(
+    "pig",
     py.transform.scale(
         py.image.load("Assets/store items/pig.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
     20000,
     250,
+    save["pig_amount"],
     store_pos(4),
 )
 
 # butterfly
 butterfly = item(
+    "butterfly",
     py.transform.scale(
         py.image.load("Assets/store items/butterfly.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
     100000,
     1000,
+    save["butterfly_amount"],
     store_pos(5),
 )
 
-storeItems = [hand, slavemewo, sword, fish, pig, butterfly]
+storeItems = {hand, slavemewo, sword, fish, pig, butterfly}
 
 # achievment
 achPLATE = py.transform.scale(
@@ -545,7 +592,7 @@ def maingame():
                 if goldclicked:
                     goldclicked = False
                     appeared = False
-                    appearin = time.time() + rd.randint(5, 15)
+                    appearin = time.time() + rd.randint(180, 600)
                     eval("meow" + str(rd.randint(1, 3)) + ".play()")
                     if cps > 1:
                         money += round(rd.uniform(200 * cps, 600 * cps))
@@ -653,5 +700,13 @@ def store():
 
 
 if __name__ == "__main__":
-    maingame()
+    try:
+        maingame()
+    finally:
+        save["cps"] = cps
+        save["money"] = money
+        save["mewoPOWER"] = mewoPOWER
+        for i in storeItems:
+            save[i.name + "_amount"] = i.amount
+        save_game(save)
     py.quit()
