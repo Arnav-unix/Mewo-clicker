@@ -1,18 +1,23 @@
+import os
 import pygame as py
 import random as rd
 from button import Button
 from pygame import mixer
 
-py.init()
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+py.init()
+mixer.init()
 
 # Window settings
-width = 720
-height = 1600
-screen = py.display.set_mode((width, height))
+
+
+screen = py.display.set_mode((0, 0))
+width, height = screen.get_size()
 
 # title and logo
-mewo = py.image.load("Assets/mewo.png")
+mewoBASE = py.image.load("Assets/mewo.png").convert_alpha()
+mewo = mewoBASE
 py.display.set_caption("Mewo Clicker")
 py.display.set_icon(mewo)
 
@@ -33,10 +38,13 @@ clock = py.time.Clock()
 # player
 mewoPOWER = 1
 mewoHOVER = False
-mewoX = 360
-mewoY = 800
-mewoSIZE = 400
-mewo = py.transform.scale(mewo, (mewoSIZE, mewoSIZE)).convert_alpha()
+mewoX = width / 2
+mewoY = height / 2
+MEWO_BASE = int(min(500, width * 0.7, height * 0.45))
+MEWO_PRESSED = int(MEWO_BASE * 1.05)
+mewoSIZE = MEWO_BASE
+mewoDRAWNSIZE = MEWO_BASE
+mewo = py.transform.scale(mewoBASE, (mewoSIZE, mewoSIZE)).convert_alpha()
 mewoHITBOX = mewo.get_rect(center=(mewoX, mewoY))
 
 # click text
@@ -69,6 +77,7 @@ formats = [
 ]
 
 
+# This is copy pasted stuff
 def human_format(num):
     global formats
     num = float("{:.3g}".format(num))
@@ -76,35 +85,40 @@ def human_format(num):
     while abs(num) >= 1000:
         magnitude += 1
         num /= 1000.0
-    try:
+    if magnitude < len(formats):
         return "{}{}".format(
             "{:f}".format(num).rstrip("0").rstrip("."), formats[magnitude]
         )
-    except:
-        return "?"
+    return "{:.2f}e{}".format(num, magnitude * 3)
 
 
 # money
-moneyX = 360
-moneyY = 200
+moneyX = width / 2
+moneyY = height * 0.13
 money = 0
 
 
-def show_money(x, y, money, size, color, center=True):
-    font = py.font.Font("Assets/KOMIKAX_.ttf", size)
+font_cache = {}
+
+
+def show_money(x, y, money, size, color, center=True, surface=None):
+    surface = surface if surface is not None else screen
+    font = font_cache.get(size)
+    if font is None:
+        font = font_cache[size] = py.font.Font("Assets/KOMIKAX_.ttf", size)
     moneyTEXT = font.render(str(money), True, color)
     if center:
         moneyRECT = moneyTEXT.get_rect(center=(x, y))
-        screen.blit(moneyTEXT, moneyRECT)
+        surface.blit(moneyTEXT, moneyRECT)
     else:
-        screen.blit(moneyTEXT, (x, y))
+        surface.blit(moneyTEXT, (x, y))
 
 
 # store
 storeIMG = py.transform.scale(
     py.image.load("Assets/store.png"), (200, 200)
 ).convert_alpha()
-storeHITBOX = storeIMG.get_rect(center=(600, 1350))
+storeHITBOX = storeIMG.get_rect(bottomright=(width - 50, height - 50))
 
 buyIMG = py.transform.scale(py.image.load("Assets/buy.png"), (120, 120)).convert_alpha()
 pr_buyIMG = py.transform.scale(
@@ -112,17 +126,31 @@ pr_buyIMG = py.transform.scale(
 ).convert_alpha()
 
 
-def itemBG(X, Y):
-    py.draw.rect(
-        screen,
-        (255, 109, 80),
-        (X - storeSIZE / 2 - 20, Y - storeSIZE / 2 - 20, 250, 150),
-        border_radius=20,
+STORE_MARGIN = 16
+STORE_GAP = 24
+STORE_HEIGHT = 0.7
+STORE_COLS = 2 if width >= 680 else 1
+STORE_CARD_W = min(
+    width / 2, (width - 2 * STORE_MARGIN - (STORE_COLS - 1) * STORE_GAP) / STORE_COLS
+)
+STORE_CARD_H = int(STORE_CARD_W * STORE_HEIGHT)
+STORE_ICON = int(min(STORE_CARD_W * 0.4, STORE_CARD_H * 0.5))
+STORE_FONT = max(12, int(STORE_CARD_H * 0.21))
+STORE_HUD = 120
+STORE_BOTTOM = 270
+STORE_SCROLL = 0
+
+
+def store_pos(index):
+    col = index % STORE_COLS
+    row = index // STORE_COLS
+    grid_w = STORE_COLS * STORE_CARD_W + (STORE_COLS - 1) * STORE_GAP
+    return (
+        (width - grid_w) / 2 + col * (STORE_CARD_W + STORE_GAP),
+        STORE_MARGIN + row * (STORE_CARD_H + STORE_GAP),
     )
 
 
-storeSCX = 0
-storeSCY = 100
 cps = 0
 
 
@@ -133,36 +161,55 @@ class item:
         global pr_buyIMG
         self.X = pos[0]
         self.Y = pos[1]
-        self.YCH = 0
+        self.baseY = pos[1]
         self.image = image
         self.price = price
         self.power = power
         self.amount = 0
-        self.button = Button(self.X + 100, self.Y - 30, buyIMG, pr_buyIMG, 1)
+        self.button = Button(0, 0, buyIMG, pr_buyIMG, STORE_ICON / 120)
 
-    def handle(self, scr):
+    def handle(self, scr, events=()):
         global money
         global cps
         global click3
 
-        self.Y += self.YCH
+        self.Y = self.baseY + STORE_SCROLL
+        if self.Y + STORE_CARD_H < 0 or self.Y > height:
+            return
+        icon_x = self.X + STORE_CARD_W * 0.08
+        icon_y = self.Y + STORE_CARD_H * 0.08
+        self.button.rect.topleft = (self.X + STORE_CARD_W * 0.56, icon_y)
         py.draw.rect(
-            screen,
+            scr,
             (0, 189, 100),
-            (self.X - 60, self.Y - 50, 300, 300),
-            border_radius=20,
+            (self.X, self.Y, STORE_CARD_W, STORE_CARD_H),
+            border_radius=int(STORE_CARD_H / 12),
         )
 
-        show_money(self.X + 160, self.Y + 160, human_format(self.price), 46, (0, 0, 0))
-        show_money(self.X + 25, self.Y + 160, human_format(self.amount), 46, (0, 0, 0))
+        show_money(
+            self.X + STORE_CARD_W * 0.74,
+            self.Y + STORE_CARD_H * 0.75,
+            human_format(self.price),
+            STORE_FONT,
+            (0, 0, 0),
+            surface=scr,
+        )
+        show_money(
+            self.X + STORE_CARD_W * 0.28,
+            self.Y + STORE_CARD_H * 0.75,
+            human_format(self.amount),
+            STORE_FONT,
+            (0, 0, 0),
+            surface=scr,
+        )
 
-        screen.blit(self.image, (self.X - 30, self.Y - 30))
-        if self.button.draw(scr):
+        scr.blit(self.image, (icon_x, icon_y))
+        if self.button.draw(scr, events):
             if money >= self.price:
                 self.amount += 1
                 money -= self.price
                 cps += self.power
-                self.price += self.price // 5
+                self.price = round(self.price * 1.10)
                 click3.set_volume(1)
                 click3.play()
                 click3.set_volume(0.3)
@@ -172,62 +219,64 @@ class item:
 # hand
 hand = item(
     py.transform.scale(
-        py.image.load("Assets/store items/hand.png"), (120, 120)
+        py.image.load("Assets/store items/hand.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    20,
+    25,
     0.2,
-    (storeSCX + 100, storeSCY),
+    store_pos(0),
 )
 
 # slave mewo
 slavemewo = item(
     py.transform.scale(
-        py.image.load("Assets/store items/slave mewo.png"), (120, 120)
+        py.image.load("Assets/store items/slave mewo.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    150,
-    3,
-    (storeSCX + 450, storeSCY),
+    125,
+    2,
+    store_pos(1),
 )
 
 # sword
 sword = item(
     py.transform.scale(
-        py.image.load("Assets/store items/sword.png"), (120, 120)
+        py.image.load("Assets/store items/sword.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    1000,
+    750,
     10,
-    (storeSCX + 100, storeSCY + 350),
+    store_pos(2),
 )
 
 # fish
 fish = item(
     py.transform.scale(
-        py.image.load("Assets/store items/fish.png"), (120, 120)
+        py.image.load("Assets/store items/fish.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    8000,
+    4000,
     50,
-    (storeSCX + 450, storeSCY + 350),
+    store_pos(3),
 )
 
 # pig
 pig = item(
     py.transform.scale(
-        py.image.load("Assets/store items/pig.png"), (120, 120)
+        py.image.load("Assets/store items/pig.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    36000,
-    200,
-    (storeSCX + 100, storeSCY + 700),
+    20000,
+    250,
+    store_pos(4),
 )
 
 # butterfly
 butterfly = item(
     py.transform.scale(
-        py.image.load("Assets/store items/butterfly.png"), (120, 120)
+        py.image.load("Assets/store items/butterfly.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    120000,
+    100000,
     1000,
-    (storeSCX + 450, storeSCY + 700),
+    store_pos(5),
 )
+
+storeItems = [hand, slavemewo, sword, fish, pig, butterfly]
 
 # achievment
 achPLATE = py.transform.scale(
@@ -255,7 +304,7 @@ class achievment:
                 if not self.gained:
                     money += self.reward
                     self.gained = True
-                if self.X != width:
+                if self.X < width:
                     self.X += 5
                     screen.blit(achPLATE, (self.X, -200))
 
@@ -357,18 +406,20 @@ def maingame():
     global mewoHOVER
     global mewoHITBOX
     global mewoPOWER
+    global mewoDRAWNSIZE
     global textXCH
 
     running = True
     while running:
+        dt = clock.tick(fps) / 1000
         screen.fill((0, 69, 42))
-        mewoSIZE = 400
+        mewoSIZE = MEWO_BASE
 
         for event in py.event.get():
             if event.type == py.QUIT:
                 running = False
             if event.type == py.MOUSEBUTTONDOWN:
-                pos = py.mouse.get_pos()
+                pos = event.pos
 
                 if mewoHITBOX.collidepoint(pos):
                     mewoHOVER = True
@@ -376,10 +427,7 @@ def maingame():
                     textX.append(pos[0])
                     textY.append(pos[1])
                     textYCH.append(-up)
-                    try:
-                        textXCH.append((pos[0] - width / 2) / 10)
-                    except ZeroDivisionError:
-                        textXCH.append(0)
+                    textXCH.append((pos[0] - width / 2) / 10)
 
                     money += mewoPOWER
                     choice = rd.choice([1, 2, 3])
@@ -392,23 +440,27 @@ def maingame():
 
                 if storeHITBOX.collidepoint(pos):
                     click2.set_volume(0.8)
-                    store()
+                    if store():
+                        running = False
+                        break
                     click2.play()
                     click2.set_volume(0.1)
 
             elif event.type == py.MOUSEBUTTONUP:
                 mewoHOVER = False
 
-        if mewoHOVER == True:
-            mewoSIZE = 420
+        if mewoHOVER and py.mouse.get_pressed()[0]:
+            mewoSIZE = MEWO_PRESSED
         else:
-            mewoSIZE = 400
+            mewoSIZE = MEWO_BASE
 
         mewoPOWER = 1 + cps / 20
 
-        money += cps / fps
+        money += cps * dt
 
-        mewo = py.transform.scale(mewo, (mewoSIZE, mewoSIZE)).convert_alpha()
+        if mewoSIZE != mewoDRAWNSIZE:
+            mewo = py.transform.scale(mewoBASE, (mewoSIZE, mewoSIZE)).convert_alpha()
+            mewoDRAWNSIZE = mewoSIZE
         mewoHITBOX = mewo.get_rect(center=(mewoX, mewoY))
 
         # achievment handling
@@ -417,21 +469,35 @@ def maingame():
 
         # nothing here
         screen.blit(mewo, mewoHITBOX)
-        show_money(moneyX, moneyY, human_format(int(money)), 104, (0, 0, 0))
-        show_money(moneyX, moneyY + 100, str(human_format(cps)) + "/s", 73, (0, 0, 0))
+        show_money(
+            moneyX,
+            moneyY,
+            human_format(int(money)),
+            int(min(104, width * 0.145)),
+            (0, 0, 0),
+        )
+        show_money(
+            moneyX,
+            moneyY + 100,
+            str(human_format(cps)) + "/s",
+            int(min(73, width * 0.11)),
+            (0, 0, 0),
+        )
         screen.blit(storeIMG, storeHITBOX)
 
         # click handling
-        for i, v in enumerate(text):
+        for i in range(len(text) - 1, -1, -1):
             ctext = font.render(text[i], True, (100, 100, 0))
             ctextrect = ctext.get_rect(center=(textX[i], textY[i]))
             screen.blit(ctext, ctextrect)
             textX[i] += textXCH[i]
             textY[i] += textYCH[i]
             textYCH[i] += gravity
-            if textXCH[i] > 0:
+            if abs(textXCH[i]) <= 0.5:
+                textXCH[i] = 0
+            elif textXCH[i] > 0:
                 textXCH[i] -= 0.5
-            elif textXCH[i] < 0:
+            else:
                 textXCH[i] += 0.5
 
             if textY[i] > height:
@@ -441,48 +507,87 @@ def maingame():
                 textYCH.pop(i)
                 textXCH.pop(i)
 
-        clock.tick(fps)
         py.display.update()
 
 
-# shop
+# store
 def store():
     global money
     global cps
-    global handPRICE
+    global STORE_SCROLL
 
-    storerunning = True
     click2.play()
     click2.set_volume(0.1)
-    while storerunning:
+    dragging = False
+    drag_start = 0
+    drag_base = 0
+    while True:
+        dt = clock.tick(fps) / 1000
         screen.fill((145, 230, 210))
 
-        for event in py.event.get():
+        events = py.event.get()
+        for event in events:
             if event.type == py.QUIT:
-                storerunning = False
-            if event.type == py.MOUSEBUTTONDOWN:
-                pos = py.mouse.get_pos()
-                if storeHITBOX.collidepoint(pos):
+                return True
+            if event.type == py.MOUSEWHEEL:
+                STORE_SCROLL += event.y * 60
+            elif event.type == py.KEYDOWN:
+                if event.key == py.K_DOWN:
+                    STORE_SCROLL -= 60
+                elif event.key == py.K_UP:
+                    STORE_SCROLL += 60
+            elif event.type == py.MOUSEBUTTONDOWN and event.button == 1:
+                if storeHITBOX.collidepoint(event.pos):
                     click2.set_volume(0.8)
                     return
+                dragging = True
+                drag_start = event.pos[1]
+                drag_base = STORE_SCROLL
+            elif event.type == py.MOUSEMOTION and dragging:
+                STORE_SCROLL = drag_base + event.pos[1] - drag_start
+            elif event.type == py.MOUSEBUTTONUP and event.button == 1:
+                dragging = False
+            elif event.type == py.FINGERDOWN:
+                fx, fy = event.x * width, event.y * height
+                if storeHITBOX.collidepoint((fx, fy)):
+                    click2.set_volume(0.8)
+                    return
+                dragging = True
+                drag_start = fy
+                drag_base = STORE_SCROLL
+            elif event.type == py.FINGERMOTION and dragging:
+                STORE_SCROLL = drag_base + event.y * height - drag_start
+            elif event.type == py.FINGERUP:
+                dragging = False
 
-        # store item handling
-        hand.handle(screen)
-        slavemewo.handle(screen)
-        sword.handle(screen)
-        fish.handle(screen)
-        pig.handle(screen)
-        butterfly.handle(screen)
+        top = min(i.baseY for i in storeItems)
+        bottom = max(i.baseY for i in storeItems) + STORE_CARD_H
+        STORE_SCROLL = max(
+            min(0, height - STORE_BOTTOM - bottom),
+            min(max(0, STORE_MARGIN - top), STORE_SCROLL),
+        )
 
-        money += cps / fps
+        for i in storeItems:
+            i.handle(screen, events)
 
+        money += cps * dt
+
+        show_money(
+            STORE_HUD,
+            height - STORE_MARGIN - STORE_HUD / 3,
+            human_format(int(money)),
+            int(min(73, width * 0.11)),
+            (0, 0, 0),
+        )
         screen.blit(storeIMG, storeHITBOX)
 
-        clock.tick(fps)
         py.display.update()
+
+
+# def extra():
+#     pass
 
 
 if __name__ == "__main__":
     maingame()
-
-py.quit()
+    py.quit()
