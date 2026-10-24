@@ -1,6 +1,7 @@
 import pygame as py
 from pygame import mixer
 from button import Button
+from math import sin
 import random as rd
 import time
 import os
@@ -39,6 +40,14 @@ pop3 = mixer.Sound("Assets/pop3.mp3")
 click1.set_volume(0.3)
 click2.set_volume(0.1)
 click3.set_volume(0.3)
+
+meow1.set_volume(0.3)
+meow2.set_volume(0.1)
+meow3.set_volume(0.3)
+
+pop1.set_volume(0.3)
+pop2.set_volume(0.3)
+pop3.set_volume(0.3)
 
 # fps
 fps = 60
@@ -219,9 +228,10 @@ class item:
                 money -= self.price
                 cps += self.power
                 self.price = round(self.price * 1.10)
-                click3.set_volume(1)
-                click3.play()
-                click3.set_volume(0.3)
+                soundchoice = str(rd.randint(1, 3))
+                eval("click" + soundchoice + ".set_volume(1)")
+                eval("click" + soundchoice + ".play()")
+                eval("click" + soundchoice + ".set_volume(1)")
 
 
 # store items
@@ -412,10 +422,11 @@ goldmewo = py.transform.scale(
 ).convert_alpha()
 goldmewoHITBOX = goldmewo.get_rect()
 
-appearin = time.time() + rd.randint(5, 15)
+appearin = time.time() + rd.randint(180, 600)
 appeared = False
 goldclicked = False
 goldwait = 0
+goldangle = 0
 
 
 # main game
@@ -433,6 +444,8 @@ def maingame():
     global appeared
     global goldclicked
     global goldwait
+    global goldmewo
+    global goldangle
 
     running = True
     while running:
@@ -455,21 +468,16 @@ def maingame():
                     textXCH.append((pos[0] - width / 2) / 10)
 
                     money += mewoPOWER
-                    choice = rd.choice([1, 2, 3])
-                    if choice == 1:
-                        click1.play()
-                    elif choice == 2:
-                        click2.play()
-                    else:
-                        click3.play()
+                    eval("pop" + str(rd.randint(1, 3)) + ".play()")
 
                 if storeHITBOX.collidepoint(pos):
-                    click2.set_volume(0.8)
+                    soundchoice = str(rd.randint(1, 3))
+                    eval("click" + soundchoice + ".set_volume(0.8)")
                     if store():
                         running = False
                         break
-                    click2.play()
-                    click2.set_volume(0.1)
+                    eval("click" + soundchoice + ".play()")
+                    eval("click" + soundchoice + ".set_volume(0.1)")
 
                 if goldmewoHITBOX.collidepoint(pos):
                     goldclicked = True
@@ -513,27 +521,38 @@ def maingame():
             (0, 0, 0),
         )
         screen.blit(storeIMG, storeHITBOX)
-
         if time.time() >= appearin:
             if not appeared:
                 goldpos = [rd.randint(0, width), rd.randint(0, height)]
-                goldmewoHITBOX.x = goldpos[0]
-                goldmewoHITBOX.y = goldpos[1]
-                screen.blit(goldmewo, goldmewoHITBOX)
-                goldwait = time.time() + rd.randint(5, 15)
+                goldangle += 2 * dt
+                goldrotation = 45 * sin(goldangle)
+                randomscale = rd.randint(120, 200)
+                randomscale = [randomscale, randomscale]
+                transformedgoldmewo = py.transform.scale(goldmewo, randomscale)
+                goldmewoHITBOX = transformedgoldmewo.get_rect(center=goldpos)
+                screen.blit(transformedgoldmewo, goldmewoHITBOX)
+                goldwait = time.time() + rd.randint(180, 600)
                 appeared = True
             else:
-                screen.blit(goldmewo, goldmewoHITBOX)
+                goldangle += 1 * dt
+                goldrotation = 20 * sin(goldangle)
+                transformedgoldmewo = py.transform.scale(goldmewo, randomscale)
+                transformedgoldmewo = py.transform.rotate(
+                    transformedgoldmewo, goldrotation
+                )
+                goldmewoHITBOX = transformedgoldmewo.get_rect(center=goldpos)
+                screen.blit(transformedgoldmewo, goldmewoHITBOX)
                 if goldclicked:
                     goldclicked = False
                     appeared = False
                     appearin = time.time() + rd.randint(5, 15)
+                    eval("meow" + str(rd.randint(1, 3)) + ".play()")
                     if cps > 1:
                         money += round(rd.uniform(200 * cps, 600 * cps))
                     else:
                         money += round(rd.uniform(200, 600))
             if time.time() >= goldwait and not goldclicked:
-                appearin = time.time() + rd.randint(5, 15)
+                appearin = time.time() + rd.randint(180, 600)
                 appeared = False
 
         # click handling
@@ -589,7 +608,6 @@ def store():
                     STORE_SCROLL += 60
             elif event.type == py.MOUSEBUTTONDOWN and event.button == 1:
                 if storeHITBOX.collidepoint(event.pos):
-                    click2.set_volume(0.8)
                     return
                 dragging = True
                 drag_start = event.pos[1]
@@ -601,7 +619,6 @@ def store():
             elif event.type == py.FINGERDOWN:
                 fx, fy = event.x * width, event.y * height
                 if storeHITBOX.collidepoint((fx, fy)):
-                    click2.set_volume(0.8)
                     return
                 dragging = True
                 drag_start = fy
