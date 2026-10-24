@@ -1,8 +1,9 @@
-import os
 import pygame as py
-import random as rd
-from button import Button
 from pygame import mixer
+from button import Button
+import random as rd
+import time
+import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -26,6 +27,14 @@ py.display.set_icon(mewo)
 click1 = mixer.Sound("Assets/click1.wav")
 click2 = mixer.Sound("Assets/click2.wav")
 click3 = mixer.Sound("Assets/click3.wav")
+
+meow1 = mixer.Sound("Assets/meow1.mp3")
+meow2 = mixer.Sound("Assets/meow2.mp3")
+meow3 = mixer.Sound("Assets/meow3.mp3")
+
+pop1 = mixer.Sound("Assets/pop1.mp3")
+pop2 = mixer.Sound("Assets/pop2.mp3")
+pop3 = mixer.Sound("Assets/pop3.mp3")
 
 click1.set_volume(0.3)
 click2.set_volume(0.1)
@@ -397,6 +406,17 @@ achLIST = [
     mewo1TDe,
 ]
 
+# Gold mewo
+goldmewo = py.transform.scale(
+    py.image.load("Assets/goldmewo.png"), (120, 120)
+).convert_alpha()
+goldmewoHITBOX = goldmewo.get_rect()
+
+appearin = time.time() + rd.randint(5, 15)
+appeared = False
+goldclicked = False
+goldwait = 0
+
 
 # main game
 def maingame():
@@ -408,6 +428,11 @@ def maingame():
     global mewoPOWER
     global mewoDRAWNSIZE
     global textXCH
+    global goldmewoHITBOX
+    global appearin
+    global appeared
+    global goldclicked
+    global goldwait
 
     running = True
     while running:
@@ -446,8 +471,12 @@ def maingame():
                     click2.play()
                     click2.set_volume(0.1)
 
+                if goldmewoHITBOX.collidepoint(pos):
+                    goldclicked = True
+
             elif event.type == py.MOUSEBUTTONUP:
                 mewoHOVER = False
+                goldclicked = False
 
         if mewoHOVER and py.mouse.get_pressed()[0]:
             mewoSIZE = MEWO_PRESSED
@@ -484,6 +513,28 @@ def maingame():
             (0, 0, 0),
         )
         screen.blit(storeIMG, storeHITBOX)
+
+        if time.time() >= appearin:
+            if not appeared:
+                goldpos = [rd.randint(0, width), rd.randint(0, height)]
+                goldmewoHITBOX.x = goldpos[0]
+                goldmewoHITBOX.y = goldpos[1]
+                screen.blit(goldmewo, goldmewoHITBOX)
+                goldwait = time.time() + rd.randint(5, 15)
+                appeared = True
+            else:
+                screen.blit(goldmewo, goldmewoHITBOX)
+                if goldclicked:
+                    goldclicked = False
+                    appeared = False
+                    appearin = time.time() + rd.randint(5, 15)
+                    if cps > 1:
+                        money += round(rd.uniform(200 * cps, 600 * cps))
+                    else:
+                        money += round(rd.uniform(200, 600))
+            if time.time() >= goldwait and not goldclicked:
+                appearin = time.time() + rd.randint(5, 15)
+                appeared = False
 
         # click handling
         for i in range(len(text) - 1, -1, -1):
@@ -582,10 +633,6 @@ def store():
         screen.blit(storeIMG, storeHITBOX)
 
         py.display.update()
-
-
-# def extra():
-#     pass
 
 
 if __name__ == "__main__":
