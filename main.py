@@ -32,15 +32,36 @@ def load_game():
             pass
 
     return {
-        "money": 0,
-        "cps": 0,
-        "mewoPOWER": 0,
-        "hand_amount": 0,
-        "slavemewo_amount": 0,
-        "sword_amount": 0,
-        "fish_amount": 0,
-        "pig_amount": 0,
-        "butterfly_amount": 0,
+        "main": {
+            "money": 0,
+            "cps": 0,
+            "mewoPOWER": 0,
+        },
+        "store": {
+            "hand": 0,
+            "slavemewo": 0,
+            "sword": 0,
+            "fish": 0,
+            "pig": 0,
+            "butterfly": 0,
+        },
+        "achievment": {
+            "mewo1": 0,
+            "mewo1K": 0,
+            "mewo1M": 0,
+            "mewo1B": 0,
+            "mewo1T": 0,
+            "mewo1Qa": 0,
+            "mewo1Qi": 0,
+            "mewo1Sx": 0,
+            "mewo1Sp": 0,
+            "mewo1Oc": 0,
+            "mewo1No": 0,
+            "mewo1De": 0,
+            "mewo1UDe": 0,
+            "mewo1DDe": 0,
+            "mewo1TDe": 0,
+        },
     }
 
 
@@ -88,7 +109,7 @@ fps = 60
 clock = py.time.Clock()
 
 # player
-mewoPOWER = save["mewoPOWER"]
+mewoPOWER = save["main"]["mewoPOWER"]
 mewoHOVER = False
 mewoX = width / 2
 mewoY = height / 2
@@ -147,7 +168,7 @@ def human_format(num):
 # money
 moneyX = width / 2
 moneyY = height * 0.13
-money = save["money"]
+money = save["main"]["money"]
 
 
 font_cache = {}
@@ -203,14 +224,12 @@ def store_pos(index):
     )
 
 
-cps = save["cps"]
+cps = save["main"]["cps"]
 
 
 # item class
 class item:
     def __init__(self, name, image, price, power, amount, pos):
-        global buyIMG
-        global pr_buyIMG
         self.X = pos[0]
         self.Y = pos[1]
         self.baseY = pos[1]
@@ -224,7 +243,6 @@ class item:
     def handle(self, scr, events=()):
         global money
         global cps
-        global click3
 
         self.Y = self.baseY + STORE_SCROLL
         if self.Y + STORE_CARD_H < 0 or self.Y > height:
@@ -278,7 +296,7 @@ hand = item(
     ).convert_alpha(),
     25,
     0.2,
-    save["hand_amount"],
+    save["store"]["hand"],
     store_pos(0),
 )
 
@@ -290,7 +308,7 @@ slavemewo = item(
     ).convert_alpha(),
     125,
     2,
-    save["slavemewo_amount"],
+    save["store"]["slavemewo"],
     store_pos(1),
 )
 
@@ -302,7 +320,7 @@ sword = item(
     ).convert_alpha(),
     750,
     10,
-    save["sword_amount"],
+    save["store"]["sword"],
     store_pos(2),
 )
 
@@ -314,7 +332,7 @@ fish = item(
     ).convert_alpha(),
     4000,
     50,
-    save["fish_amount"],
+    save["store"]["fish"],
     store_pos(3),
 )
 
@@ -326,7 +344,7 @@ pig = item(
     ).convert_alpha(),
     20000,
     250,
-    save["pig_amount"],
+    save["store"]["pig"],
     store_pos(4),
 )
 
@@ -338,7 +356,7 @@ butterfly = item(
     ).convert_alpha(),
     100000,
     1000,
-    save["butterfly_amount"],
+    save["store"]["butterfly"],
     store_pos(5),
 )
 
@@ -352,24 +370,23 @@ achPLATE = py.transform.scale(
 
 # achievment class
 class achievment:
-    def __init__(self, name, type, amount, reward):
+    def __init__(self, name, achNAME, typee, amount, reward, gained):
         self.name = name
-        self.type = type
+        self.achNAME = achNAME
+        self.typee = typee
         self.amount = amount
         self.reward = reward
-        self.gained = False
+        self.gained = gained
         self.X = -500
         self.done = False
         self.timer = 0
 
     def handle(self):
         global money
-        global achPLATE
-        if self.type == "Clicked":
-            if money >= self.amount:
-                if not self.gained:
-                    money += self.reward
-                    self.gained = True
+        if self.typee == "Clicked":
+            if money >= self.amount and not self.gained:
+                money += self.reward
+                self.gained = True
                 if self.X < width:
                     self.X += 5
                     screen.blit(achPLATE, (self.X, -200))
@@ -378,70 +395,124 @@ class achievment:
 
 
 # achievments
-mewo1 = achievment("Click 1 time", "Clicked", 1, 0)
+mewo1 = achievment(
+    "Click 1 time", "mewo1", "Clicked", 1, 0, save["achievment"]["mewo1"]
+)
 
-mewo1K = achievment("Click 1K times", "Clicked", 1000, 100)
+mewo1K = achievment(
+    "Click 1K times", "mewo1K", "Clicked", 1000, 100, save["achievment"]["mewo1K"]
+)
 
-mewo1M = achievment("Click 1M times", "Clicked", 1000000, 100000)
+mewo1M = achievment(
+    "Click 1M times", "mewo1M", "Clicked", 1000000, 100000, save["achievment"]["mewo1M"]
+)
 
-mewo1B = achievment("Click 1B times", "Clicked", 1000000000, 100000000)
+mewo1B = achievment(
+    "Click 1B times",
+    "mewo1B",
+    "Clicked",
+    1000000000,
+    100000000,
+    save["achievment"]["mewo1B"],
+)
 
-mewo1T = achievment("Click 1T times", "Clicked", 1000000000000, 100000000000)
+mewo1T = achievment(
+    "Click 1T times",
+    "mewo1T",
+    "Clicked",
+    1000000000000,
+    100000000000,
+    save["achievment"]["mewo1T"],
+)
 
-mewo1Qa = achievment("Click 1Qa times", "Clicked", 1000000000000000, 100000000000000)
+mewo1Qa = achievment(
+    "Click 1Qa times",
+    "mewo1Qa",
+    "Clicked",
+    1000000000000000,
+    100000000000000,
+    save["achievment"]["mewo1Qa"],
+)
 
 mewo1Qi = achievment(
-    "Click 1Qi times", "Clicked", 1000000000000000000, 100000000000000000
+    "Click 1Qi times",
+    "mewo1Qi",
+    "Clicked",
+    1000000000000000000,
+    100000000000000000,
+    save["achievment"]["mewo1Qi"],
 )
 
 mewo1Sx = achievment(
-    "Click 1Sx times", "Clicked", 1000000000000000000000, 100000000000000000000
+    "Click 1Sx times",
+    "mewo1Sx",
+    "Clicked",
+    1000000000000000000000,
+    100000000000000000000,
+    save["achievment"]["mewo1Sx"],
 )
 
 mewo1Sp = achievment(
-    "Click 1Sp times", "Clicked", 1000000000000000000000000, 100000000000000000000000
+    "Click 1Sp times",
+    "mewo1Sp",
+    "Clicked",
+    1000000000000000000000000,
+    100000000000000000000000,
+    save["achievment"]["mewo1Sp"],
 )
 
 mewo1Oc = achievment(
     "Click 1Oc times",
+    "mewo1Oc",
     "Clicked",
     1000000000000000000000000000,
     100000000000000000000000000,
+    save["achievment"]["mewo1Oc"],
 )
 
 mewo1No = achievment(
     "Click 1No times",
+    "mewo1No",
     "Clicked",
     1000000000000000000000000000000,
     100000000000000000000000000000,
+    save["achievment"]["mewo1No"],
 )
 
 mewo1De = achievment(
     "Click 1De times",
+    "mewo1De",
     "Clicked",
     1000000000000000000000000000000000,
     100000000000000000000000000000000,
+    save["achievment"]["mewo1De"],
 )
 
 mewo1UDe = achievment(
     "Click 1UDe times",
+    "mewo1UDe",
     "Clicked",
     1000000000000000000000000000000000000,
     100000000000000000000000000000000000,
+    save["achievment"]["mewo1UDe"],
 )
 
 mewo1DDe = achievment(
     "Click 1DDe times",
+    "mewo1DDe",
     "Clicked",
     1000000000000000000000000000000000000000,
     100000000000000000000000000000000000000,
+    save["achievment"]["mewo1DDe"],
 )
 
 mewo1TDe = achievment(
     "Click 1TDe times",
+    "mewo1TDe",
     "Clicked",
     1000000000000000000000000000000000000000000,
     100000000000000000000000000000000000000000,
+    save["achievment"]["mewo1TDe"],
 )
 
 
@@ -703,10 +774,12 @@ if __name__ == "__main__":
     try:
         maingame()
     finally:
-        save["cps"] = cps
-        save["money"] = money
-        save["mewoPOWER"] = mewoPOWER
+        save["main"]["cps"] = cps
+        save["main"]["money"] = money
+        save["main"]["mewoPOWER"] = mewoPOWER
         for i in storeItems:
-            save[i.name + "_amount"] = i.amount
+            save["store"][i.name] = i.amount
+        for i in achLIST:
+            save["achievment"][i.achNAME] = i.gained
         save_game(save)
     py.quit()
