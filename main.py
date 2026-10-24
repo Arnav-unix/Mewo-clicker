@@ -35,15 +35,21 @@ def load_game():
         "main": {
             "money": 0,
             "cps": 0,
-            "mewoPOWER": 0,
+            "mewoPOWER": 1,
         },
         "store": {
             "hand": 0,
+            "hand_price": 25,
             "slavemewo": 0,
+            "slavemewo_price": 125,
             "sword": 0,
+            "sword_price": 750,
             "fish": 0,
+            "fish_price": 4000,
             "pig": 0,
+            "pig_price": 20000,
             "butterfly": 0,
+            "butterfly_price": 100000,
         },
         "achievment": {
             "mewo1": 0,
@@ -294,7 +300,7 @@ hand = item(
     py.transform.scale(
         py.image.load("Assets/store items/hand.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    25,
+    save["store"].get("hand_price", 25),
     0.2,
     save["store"]["hand"],
     store_pos(0),
@@ -306,7 +312,7 @@ slavemewo = item(
     py.transform.scale(
         py.image.load("Assets/store items/slave mewo.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    125,
+    save["store"].get("slavemewo_price", 125),
     2,
     save["store"]["slavemewo"],
     store_pos(1),
@@ -318,7 +324,7 @@ sword = item(
     py.transform.scale(
         py.image.load("Assets/store items/sword.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    750,
+    save["store"].get("sword_price", 750),
     10,
     save["store"]["sword"],
     store_pos(2),
@@ -330,7 +336,7 @@ fish = item(
     py.transform.scale(
         py.image.load("Assets/store items/fish.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    4000,
+    save["store"].get("fish_price", 4000),
     50,
     save["store"]["fish"],
     store_pos(3),
@@ -342,7 +348,7 @@ pig = item(
     py.transform.scale(
         py.image.load("Assets/store items/pig.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    20000,
+    save["store"].get("pig_price", 20000),
     250,
     save["store"]["pig"],
     store_pos(4),
@@ -354,13 +360,14 @@ butterfly = item(
     py.transform.scale(
         py.image.load("Assets/store items/butterfly.png"), (STORE_ICON, STORE_ICON)
     ).convert_alpha(),
-    100000,
+    save["store"].get("butterfly_price", 100000),
     1000,
     save["store"]["butterfly"],
     store_pos(5),
 )
 
 storeItems = {hand, slavemewo, sword, fish, pig, butterfly}
+
 
 # achievment
 achPLATE = py.transform.scale(
@@ -380,18 +387,22 @@ class achievment:
         self.X = -500
         self.done = False
         self.timer = 0
+        self.draw = False
 
     def handle(self):
         global money
         if self.typee == "Clicked":
             if money >= self.amount and not self.gained:
                 money += self.reward
+                self.draw = True
                 self.gained = True
-                if self.X < width:
+            if self.draw:
+                if self.X <= width:
                     self.X += 5
                     screen.blit(achPLATE, (self.X, -200))
-
                     show_money(self.X + 100, 25, self.name, 41, (0, 0, 0), center=False)
+                else:
+                    self.draw = False
 
 
 # achievments
@@ -779,6 +790,7 @@ if __name__ == "__main__":
         save["main"]["mewoPOWER"] = mewoPOWER
         for i in storeItems:
             save["store"][i.name] = i.amount
+            save["store"][i.name + "_price"] = i.price
         for i in achLIST:
             save["achievment"][i.achNAME] = i.gained
         save_game(save)
