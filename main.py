@@ -556,6 +556,8 @@ appeared = False
 goldclicked = False
 goldwait = 0
 goldangle = 0
+buff = 0
+buffed = False
 
 
 # main game
@@ -575,6 +577,8 @@ def maingame():
     global goldwait
     global goldmewo
     global goldangle
+    global buff
+    global buffed
 
     running = True
     while running:
@@ -622,7 +626,10 @@ def maingame():
 
         mewoPOWER = 1 + cps / 20
 
-        money += cps * dt
+        if buffed and time.time() >= buff:
+            buffed = False
+
+        money += cps * (3 if buffed else 1) * dt
 
         if mewoSIZE != mewoDRAWNSIZE:
             mewo = py.transform.scale(mewoBASE, (mewoSIZE, mewoSIZE)).convert_alpha()
@@ -645,9 +652,9 @@ def maingame():
         show_money(
             moneyX,
             moneyY + 100,
-            str(human_format(cps)) + "/s",
+            str(human_format(cps * (3 if buffed else 1))) + "/s",
             int(min(73, width * 0.11)),
-            (0, 0, 0),
+            (150, 100, 0) if buffed else (0, 0, 0),
         )
         screen.blit(storeIMG, storeHITBOX)
         if time.time() >= appearin:
@@ -660,7 +667,7 @@ def maingame():
                 transformedgoldmewo = py.transform.scale(goldmewo, randomscale)
                 goldmewoHITBOX = transformedgoldmewo.get_rect(center=goldpos)
                 screen.blit(transformedgoldmewo, goldmewoHITBOX)
-                goldwait = time.time() + rd.randint(180, 600)
+                goldwait = time.time() + rd.randint(5, 15)
                 appeared = True
             else:
                 goldangle += 1 * dt
@@ -676,10 +683,16 @@ def maingame():
                     appeared = False
                     appearin = time.time() + rd.randint(180, 600)
                     eval("meow" + str(rd.randint(1, 3)) + ".play()")
-                    if cps > 1:
-                        money += round(rd.uniform(200 * cps, 600 * cps))
+                    choice = rd.randint(1, 2)
+                    if choice == 1:
+                        if cps > 1:
+                            money += round(rd.uniform(200 * cps, 600 * cps))
+                        else:
+                            money += round(rd.uniform(200, 600))
                     else:
-                        money += round(rd.uniform(200, 600))
+                        buffed = True
+                        buff = time.time() + rd.randint(180, 600)
+
             if time.time() >= goldwait and not goldclicked:
                 appearin = time.time() + rd.randint(180, 600)
                 appeared = False
