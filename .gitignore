@@ -1,6 +1,9 @@
 __pycache__/
 build/
 dist/
-save.toml
 main.spec
 .buildozer/
+.venv/
+
+# I dont want you getting my save...
+save.toml

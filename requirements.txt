@@ -1,0 +1,5 @@
+# Runtime dependencies (Python 3.11+, tomllib is part of the standard library).
+# pygame-ce is a drop-in fork of pygame that provides the "pygame" module and
+# ships prebuilt wheels with mixer support for newer Python versions.
+pygame-ce==2.5.8
+tomli_w==1.2.0

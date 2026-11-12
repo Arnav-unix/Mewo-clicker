@@ -74,8 +74,16 @@ def load_game():
 save = load_game()
 
 # Window settings
+# (0, 0) means fullscreen, so use a normal resizable window instead.
+LOGICAL_W, LOGICAL_H = 1280, 720
+desktop_w, desktop_h = py.display.get_desktop_sizes()[0]
+win_w = min(LOGICAL_W, int(desktop_w * 0.9))
+win_h = int(win_w * LOGICAL_H / LOGICAL_W)
+if win_h > desktop_h * 0.9:
+    win_h = int(desktop_h * 0.9)
+    win_w = int(win_h * LOGICAL_W / LOGICAL_H)
 
-screen = py.display.set_mode((0, 0))
+screen = py.display.set_mode((win_w, win_h), py.RESIZABLE)
 width, height = screen.get_size()
 
 # title and logo
@@ -194,9 +202,8 @@ def show_money(x, y, money, size, color, center=True, surface=None):
 
 
 # store
-storeIMG = py.transform.scale(
-    py.image.load("Assets/store.png"), (200, 200)
-).convert_alpha()
+storeBASE = py.image.load("Assets/store.png").convert_alpha()
+storeIMG = py.transform.scale(storeBASE, (200, 200))
 storeHITBOX = storeIMG.get_rect(bottomright=(width - 50, height - 50))
 
 buyIMG = py.transform.scale(py.image.load("Assets/buy.png"), (120, 120)).convert_alpha()
@@ -236,15 +243,20 @@ cps = save["main"]["cps"]
 # item class
 class item:
     def __init__(self, name, image, price, power, amount, pos):
-        self.X = pos[0]
-        self.Y = pos[1]
-        self.baseY = pos[1]
         self.name = name
-        self.image = image
+        self.source = image
         self.price = price
         self.power = power
         self.amount = amount
+        self.resize(pos)
+
+    def resize(self, pos):
+        self.image = py.transform.scale(
+            self.source, (STORE_ICON, STORE_ICON)
+        ).convert_alpha()
         self.button = Button(0, 0, buyIMG, pr_buyIMG, STORE_ICON / 120)
+        self.X, self.baseY = pos
+        self.Y = self.baseY
 
     def handle(self, scr, events=()):
         global money
@@ -294,79 +306,97 @@ class item:
 
 
 # store items
-# hand
 hand = item(
     "hand",
-    py.transform.scale(
-        py.image.load("Assets/store items/hand.png"), (STORE_ICON, STORE_ICON)
-    ).convert_alpha(),
+    py.image.load("Assets/store items/hand.png"),
     save["store"].get("hand_price", 25),
     0.2,
     save["store"]["hand"],
     store_pos(0),
 )
 
-# slave mewo
 slavemewo = item(
     "slavemewo",
-    py.transform.scale(
-        py.image.load("Assets/store items/slave mewo.png"), (STORE_ICON, STORE_ICON)
-    ).convert_alpha(),
+    py.image.load("Assets/store items/slave mewo.png"),
     save["store"].get("slavemewo_price", 125),
     2,
     save["store"]["slavemewo"],
     store_pos(1),
 )
 
-# sword
 sword = item(
     "sword",
-    py.transform.scale(
-        py.image.load("Assets/store items/sword.png"), (STORE_ICON, STORE_ICON)
-    ).convert_alpha(),
+    py.image.load("Assets/store items/sword.png"),
     save["store"].get("sword_price", 750),
     10,
     save["store"]["sword"],
     store_pos(2),
 )
 
-# fish
 fish = item(
     "fish",
-    py.transform.scale(
-        py.image.load("Assets/store items/fish.png"), (STORE_ICON, STORE_ICON)
-    ).convert_alpha(),
+    py.image.load("Assets/store items/fish.png"),
     save["store"].get("fish_price", 4000),
     50,
     save["store"]["fish"],
     store_pos(3),
 )
 
-# pig
 pig = item(
     "pig",
-    py.transform.scale(
-        py.image.load("Assets/store items/pig.png"), (STORE_ICON, STORE_ICON)
-    ).convert_alpha(),
+    py.image.load("Assets/store items/pig.png"),
     save["store"].get("pig_price", 20000),
     250,
     save["store"]["pig"],
     store_pos(4),
 )
 
-# butterfly
 butterfly = item(
     "butterfly",
-    py.transform.scale(
-        py.image.load("Assets/store items/butterfly.png"), (STORE_ICON, STORE_ICON)
-    ).convert_alpha(),
+    py.image.load("Assets/store items/butterfly.png"),
     save["store"].get("butterfly_price", 100000),
     1000,
     save["store"]["butterfly"],
     store_pos(5),
 )
 
-storeItems = {hand, slavemewo, sword, fish, pig, butterfly}
+storeItems = [hand, slavemewo, sword, fish, pig, butterfly]
+
+
+def layout():
+    global width, height, mewo, mewoX, mewoY, mewoHITBOX
+    global MEWO_BASE, MEWO_PRESSED, mewoSIZE, mewoDRAWNSIZE
+    global moneyX, moneyY, storeIMG, storeHITBOX
+    global STORE_COLS, STORE_CARD_W, STORE_CARD_H, STORE_ICON, STORE_FONT
+
+    width, height = screen.get_size()
+
+    mewoX, mewoY = width / 2, height / 2
+    MEWO_BASE = int(min(500, width * 0.7, height * 0.45))
+    MEWO_PRESSED = int(MEWO_BASE * 1.05)
+    mewoSIZE = mewoDRAWNSIZE = MEWO_BASE
+    mewo = py.transform.scale(mewoBASE, (MEWO_BASE, MEWO_BASE)).convert_alpha()
+    mewoHITBOX = mewo.get_rect(center=(mewoX, mewoY))
+
+    moneyX, moneyY = width / 2, height * 0.13
+
+    storeIMG = py.transform.scale(storeBASE, (200, 200)).convert_alpha()
+    storeHITBOX = storeIMG.get_rect(bottomright=(width - 50, height - 50))
+
+    STORE_COLS = 2 if width >= 680 else 1
+    STORE_CARD_W = min(
+        width / 2,
+        (width - 2 * STORE_MARGIN - (STORE_COLS - 1) * STORE_GAP) / STORE_COLS,
+    )
+    STORE_CARD_H = int(STORE_CARD_W * STORE_HEIGHT)
+    STORE_ICON = int(min(STORE_CARD_W * 0.4, STORE_CARD_H * 0.5))
+    STORE_FONT = max(12, int(STORE_CARD_H * 0.21))
+
+    for index, i in enumerate(storeItems):
+        i.resize(store_pos(index))
+
+
+layout()
 
 
 # achievment
@@ -583,12 +613,16 @@ def maingame():
     running = True
     while running:
         dt = clock.tick(fps) / 1000
+        if screen.get_size() != (width, height):
+            layout()
         screen.fill((0, 69, 42))
         mewoSIZE = MEWO_BASE
 
         for event in py.event.get():
             if event.type == py.QUIT:
                 running = False
+            if event.type == py.KEYDOWN and event.key == py.K_F11:
+                py.display.toggle_fullscreen()
             if event.type == py.MOUSEBUTTONDOWN:
                 pos = event.pos
 
@@ -735,6 +769,8 @@ def store():
     drag_base = 0
     while True:
         dt = clock.tick(fps) / 1000
+        if screen.get_size() != (width, height):
+            layout()
         screen.fill((145, 230, 210))
 
         events = py.event.get()
@@ -744,7 +780,9 @@ def store():
             if event.type == py.MOUSEWHEEL:
                 STORE_SCROLL += event.y * 60
             elif event.type == py.KEYDOWN:
-                if event.key == py.K_DOWN:
+                if event.key == py.K_F11:
+                    py.display.toggle_fullscreen()
+                elif event.key == py.K_DOWN:
                     STORE_SCROLL -= 60
                 elif event.key == py.K_UP:
                     STORE_SCROLL += 60
