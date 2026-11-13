@@ -11,7 +11,13 @@ import sys
 
 if getattr(sys, "frozen", False):
     BASE_DIR = sys._MEIPASS
-    DATA_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    if sys.platform == "darwin":
+        DATA_DIR = os.path.join(
+            os.path.expanduser("~"), "Library", "Application Support", "Mewo Clicker"
+        )
+        os.makedirs(DATA_DIR, exist_ok=True)
+    else:
+        DATA_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = BASE_DIR

@@ -13,7 +13,7 @@ Click Mewo, buy upgrades, unlock achievements and hunt the golden Mewo.
 - **Achievements** — milestones slide in from the top and pay a reward.
 - **Golden Mewo** — a spinning cat appears somewhere on screen for 5–15 seconds
   every 3–10 minutes. Tap it for a big money bonus or a 3× CPS boost.
-- Progress is saved to `save.toml` next to the game. Delete that file to reset.
+- Progress is saved to `save.toml`. Delete that file to reset.
 
 Desktop controls: mouse, `F11` toggles fullscreen.
 
@@ -44,21 +44,16 @@ chmod +x main-linux-x86_64
 ./main-linux-x86_64
 ```
 
-To build your own, use the checked-in spec (it bundles `Assets/` and produces a
-single-file executable):
+To build your own, use the checked-in spec (it bundles `Assets/`). It produces a
+single-file binary on Linux/Windows and a `.app` on macOS:
 
 ```bash
-pip install pyinstaller
+pip install pyinstaller==6.22.3
 python3 -m PyInstaller --noconfirm --clean "Mewo Clicker.spec"
 ```
 
-```bash
-./dist/"Mewo Clicker"          # Linux/macOS
-.\dist\Mewo Clicker.exe        # Windows
-```
-
-`save.toml` is written next to the executable, so the game folder needs to be
-writable.
+PyInstaller cannot cross-compile, so Windows and macOS builds have to be made on
+those systems. No prebuilt Windows or macOS binaries are provided.
 
 ## Android
 
@@ -126,10 +121,12 @@ p4a-recipes/            local python-for-android recipes
 buildozer.spec          Android build configuration
 build-debug.sh          buildozer android debug wrapper
 build-release.sh        buildozer android release wrapper
+"Mewo Clicker.spec"     PyInstaller build spec (Linux/Windows/macOS)
 requirements.txt        desktop Python dependencies
 ```
 
 ## Windows / macOS / 32-bit
 
-The author only has Linux and Android, so those builds are untested. The source
-run and PyInstaller steps above should work, but no promises.
+Only Linux and Android builds are provided and tested. The source runs on Windows
+and macOS, and the PyInstaller spec supports them, but those builds are untested
+and no prebuilt binaries are published for them.
