@@ -7,20 +7,46 @@ from math import sin
 import random as rd
 import time
 import os
+import sys
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+if getattr(sys, "frozen", False):
+    BASE_DIR = sys._MEIPASS
+    DATA_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_DIR = BASE_DIR
+    os.chdir(BASE_DIR)
+ASSET_DIR = os.path.join(BASE_DIR, "Assets")
+
+
+def asset(path):
+    return os.path.join(ASSET_DIR, path)
+
 
 py.init()
 mixer.init()
 
 # Save system
 
-save_file = "save.toml"
+
+def get_save_path():
+    try:
+        from android.storage import app_storage_path
+
+        base_dir = app_storage_path()
+    except ImportError:
+        base_dir = DATA_DIR
+    return os.path.join(base_dir, "save.toml")
 
 
-def save_game(data):
-    with open(save_file, "wb") as file:
+save_file = get_save_path()
+
+
+def save_data(data):
+    tmp_file = save_file + ".tmp"
+    with open(tmp_file, "wb") as file:
         tomli_w.dump(data, file)
+    os.replace(tmp_file, save_file)
 
 
 def load_game():
@@ -30,12 +56,12 @@ def load_game():
                 return tomllib.load(file)
         except (OSError, tomllib.TOMLDecodeError):
             pass
-
     return {
         "main": {
             "money": 0,
             "cps": 0,
             "mewoPOWER": 1,
+            "time": 0,
         },
         "store": {
             "hand": 0,
@@ -71,40 +97,56 @@ def load_game():
     }
 
 
+def save_game():
+    save["main"]["cps"] = cps
+    save["main"]["money"] = money
+    save["main"]["mewoPOWER"] = mewoPOWER
+    save["main"]["time"] = time.time()
+    for i in storeItems:
+        save["store"][i.name] = i.amount
+        save["store"][i.name + "_price"] = i.price
+    for i in achLIST:
+        save["achievment"][i.achNAME] = i.gained
+        save_data(save)
+
+
 save = load_game()
 
-# Window settings
-# (0, 0) means fullscreen, so use a normal resizable window instead.
-LOGICAL_W, LOGICAL_H = 1280, 720
-desktop_w, desktop_h = py.display.get_desktop_sizes()[0]
-win_w = min(LOGICAL_W, int(desktop_w * 0.9))
-win_h = int(win_w * LOGICAL_H / LOGICAL_W)
-if win_h > desktop_h * 0.9:
-    win_h = int(desktop_h * 0.9)
-    win_w = int(win_h * LOGICAL_W / LOGICAL_H)
 
-screen = py.display.set_mode((win_w, win_h), py.RESIZABLE)
+# Window settings
+if os.environ.get("ANDROID_ARGUMENT"):
+    screen = py.display.set_mode((0, 0), py.FULLSCREEN)
+else:
+    # (0, 0) means fullscreen, so use a normal resizable window instead.
+    LOGICAL_W, LOGICAL_H = 1280, 720
+    desktop_w, desktop_h = py.display.get_desktop_sizes()[0]
+    win_w = min(LOGICAL_W, int(desktop_w * 0.9))
+    win_h = int(win_w * LOGICAL_H / LOGICAL_W)
+    if win_h > desktop_h * 0.9:
+        win_h = int(desktop_h * 0.9)
+        win_w = int(win_h * LOGICAL_W / LOGICAL_H)
+    screen = py.display.set_mode((win_w, win_h), py.RESIZABLE)
 width, height = screen.get_size()
 
 # title and logo
-mewoBASE = py.image.load("Assets/mewo.png").convert_alpha()
+mewoBASE = py.image.load(asset("mewo.png")).convert_alpha()
 mewo = mewoBASE
 py.display.set_caption("Mewo Clicker")
 py.display.set_icon(mewo)
 
 # ------------work-------------
 # sounds
-click1 = mixer.Sound("Assets/click1.wav")
-click2 = mixer.Sound("Assets/click2.wav")
-click3 = mixer.Sound("Assets/click3.wav")
+click1 = mixer.Sound(asset("click1.wav"))
+click2 = mixer.Sound(asset("click2.wav"))
+click3 = mixer.Sound(asset("click3.wav"))
 
-meow1 = mixer.Sound("Assets/meow1.mp3")
-meow2 = mixer.Sound("Assets/meow2.mp3")
-meow3 = mixer.Sound("Assets/meow3.mp3")
+meow1 = mixer.Sound(asset("meow1.ogg"))
+meow2 = mixer.Sound(asset("meow2.ogg"))
+meow3 = mixer.Sound(asset("meow3.ogg"))
 
-pop1 = mixer.Sound("Assets/pop1.mp3")
-pop2 = mixer.Sound("Assets/pop2.mp3")
-pop3 = mixer.Sound("Assets/pop3.mp3")
+pop1 = mixer.Sound(asset("pop1.ogg"))
+pop2 = mixer.Sound(asset("pop2.ogg"))
+pop3 = mixer.Sound(asset("pop3.ogg"))
 
 click1.set_volume(0.3)
 click2.set_volume(0.1)
@@ -134,15 +176,16 @@ mewoDRAWNSIZE = MEWO_BASE
 mewo = py.transform.scale(mewoBASE, (mewoSIZE, mewoSIZE)).convert_alpha()
 mewoHITBOX = mewo.get_rect(center=(mewoX, mewoY))
 
-# click text
-gravity = 5
-up = 30
+# click text (px per second)
+gravity = 845
+up = 390
+drag = 84.5
 text = []
 textX = []
 textY = []
 textXCH = []
 textYCH = []
-font = py.font.Font("Assets/KOMIKAX_.ttf", 61)
+font = py.font.Font(asset("KOMIKAX_.ttf"), 61)
 
 # conversion
 formats = [
@@ -192,7 +235,7 @@ def show_money(x, y, money, size, color, center=True, surface=None):
     surface = surface if surface is not None else screen
     font = font_cache.get(size)
     if font is None:
-        font = font_cache[size] = py.font.Font("Assets/KOMIKAX_.ttf", size)
+        font = font_cache[size] = py.font.Font(asset("KOMIKAX_.ttf"), size)
     moneyTEXT = font.render(str(money), True, color)
     if center:
         moneyRECT = moneyTEXT.get_rect(center=(x, y))
@@ -201,19 +244,21 @@ def show_money(x, y, money, size, color, center=True, surface=None):
         surface.blit(moneyTEXT, (x, y))
 
 
-# store
-storeBASE = py.image.load("Assets/store.png").convert_alpha()
-storeIMG = py.transform.scale(storeBASE, (200, 200))
-storeHITBOX = storeIMG.get_rect(bottomright=(width - 50, height - 50))
+# exitBASE = py.image.load(asset("exit.png")).convert_alpha()
+# exitIMG = py.transform.scale(exitBASE, (200, 200))
+# exitHITBOX = exitIMG.get_rect(bottomleft=(50, height - 50))
 
-buyIMG = py.transform.scale(py.image.load("Assets/buy.png"), (120, 120)).convert_alpha()
+buyIMG = py.transform.scale(py.image.load(asset("buy.png")), (120, 120)).convert_alpha()
 pr_buyIMG = py.transform.scale(
-    py.image.load("Assets/pr_buy.png"), (120, 120)
+    py.image.load(asset("pr_buy.png")), (120, 120)
 ).convert_alpha()
 
 
 STORE_MARGIN = 16
 STORE_GAP = 24
+storeBASE = py.image.load(asset("store.png")).convert_alpha()
+storeIMG = py.transform.scale(storeBASE, (200, 200))
+storeHITBOX = storeIMG.get_rect(bottomright=(width - 50, height - 50))
 STORE_HEIGHT = 0.7
 STORE_COLS = 2 if width >= 680 else 1
 STORE_CARD_W = min(
@@ -238,6 +283,8 @@ def store_pos(index):
 
 
 cps = save["main"]["cps"]
+
+money += cps * (time.time() - save["main"]["time"])
 
 
 # item class
@@ -305,10 +352,10 @@ class item:
                 eval("click" + soundchoice + ".set_volume(1)")
 
 
-# store items
+# store-items
 hand = item(
     "hand",
-    py.image.load("Assets/store items/hand.png"),
+    py.image.load(asset("store-items/hand.png")),
     save["store"].get("hand_price", 25),
     0.2,
     save["store"]["hand"],
@@ -317,7 +364,7 @@ hand = item(
 
 slavemewo = item(
     "slavemewo",
-    py.image.load("Assets/store items/slave mewo.png"),
+    py.image.load(asset("store-items/slave-mewo.png")),
     save["store"].get("slavemewo_price", 125),
     2,
     save["store"]["slavemewo"],
@@ -326,7 +373,7 @@ slavemewo = item(
 
 sword = item(
     "sword",
-    py.image.load("Assets/store items/sword.png"),
+    py.image.load(asset("store-items/sword.png")),
     save["store"].get("sword_price", 750),
     10,
     save["store"]["sword"],
@@ -335,7 +382,7 @@ sword = item(
 
 fish = item(
     "fish",
-    py.image.load("Assets/store items/fish.png"),
+    py.image.load(asset("store-items/fish.png")),
     save["store"].get("fish_price", 4000),
     50,
     save["store"]["fish"],
@@ -344,7 +391,7 @@ fish = item(
 
 pig = item(
     "pig",
-    py.image.load("Assets/store items/pig.png"),
+    py.image.load(asset("store-items/pig.png")),
     save["store"].get("pig_price", 20000),
     250,
     save["store"]["pig"],
@@ -353,7 +400,7 @@ pig = item(
 
 butterfly = item(
     "butterfly",
-    py.image.load("Assets/store items/butterfly.png"),
+    py.image.load(asset("store-items/butterfly.png")),
     save["store"].get("butterfly_price", 100000),
     1000,
     save["store"]["butterfly"],
@@ -401,7 +448,7 @@ layout()
 
 # achievment
 achPLATE = py.transform.scale(
-    py.image.load("Assets/achievment display.png"), (500, 500)
+    py.image.load(asset("achievment-display.png")), (500, 500)
 ).convert_alpha()
 
 
@@ -419,7 +466,7 @@ class achievment:
         self.timer = 0
         self.draw = False
 
-    def handle(self):
+    def handle(self, dt):
         global money
         if self.typee == "Clicked":
             if money >= self.amount and not self.gained:
@@ -428,7 +475,7 @@ class achievment:
                 self.gained = True
             if self.draw:
                 if self.X <= width:
-                    self.X += 5
+                    self.X += 65 * dt
                     screen.blit(achPLATE, (self.X, -200))
                     show_money(self.X + 100, 25, self.name, 41, (0, 0, 0), center=False)
                 else:
@@ -577,7 +624,7 @@ achLIST = [
 
 # Gold mewo
 goldmewo = py.transform.scale(
-    py.image.load("Assets/goldmewo.png"), (120, 120)
+    py.image.load(asset("goldmewo.png")), (120, 120)
 ).convert_alpha()
 goldmewoHITBOX = goldmewo.get_rect()
 
@@ -599,13 +646,11 @@ def maingame():
     global mewoHITBOX
     global mewoPOWER
     global mewoDRAWNSIZE
-    global textXCH
     global goldmewoHITBOX
     global appearin
     global appeared
     global goldclicked
     global goldwait
-    global goldmewo
     global goldangle
     global buff
     global buffed
@@ -621,6 +666,12 @@ def maingame():
         for event in py.event.get():
             if event.type == py.QUIT:
                 running = False
+            elif event.type in (
+                py.APP_WILLENTERBACKGROUND,
+                py.APP_DIDENTERBACKGROUND,
+                py.APP_TERMINATING,
+            ):
+                save_game()
             if event.type == py.KEYDOWN and event.key == py.K_F11:
                 py.display.toggle_fullscreen()
             if event.type == py.MOUSEBUTTONDOWN:
@@ -632,7 +683,7 @@ def maingame():
                     textX.append(pos[0])
                     textY.append(pos[1])
                     textYCH.append(-up)
-                    textXCH.append((pos[0] - width / 2) / 10)
+                    textXCH.append((pos[0] - width / 2) / 10 * 13)
 
                     money += mewoPOWER
                     eval("pop" + str(rd.randint(1, 3)) + ".play()")
@@ -640,11 +691,17 @@ def maingame():
                 if storeHITBOX.collidepoint(pos):
                     soundchoice = str(rd.randint(1, 3))
                     eval("click" + soundchoice + ".set_volume(0.8)")
+                    save_game()
                     if store():
                         running = False
-                        break
+                    save_game()
                     eval("click" + soundchoice + ".play()")
                     eval("click" + soundchoice + ".set_volume(0.1)")
+
+                # if exitHITBOX.collidepoint(pos):
+                #     soundchoice = str(rd.randint(1, 3))
+                #     eval("click" + soundchoice + ".set_volume(0.8)")
+                #     running = False
 
                 if goldmewoHITBOX.collidepoint(pos):
                     goldclicked = True
@@ -672,7 +729,7 @@ def maingame():
 
         # achievment handling
         for name in achLIST:
-            name.handle()
+            name.handle(dt)
 
         # nothing here
         screen.blit(mewo, mewoHITBOX)
@@ -691,60 +748,56 @@ def maingame():
             (150, 100, 0) if buffed else (0, 0, 0),
         )
         screen.blit(storeIMG, storeHITBOX)
+        # screen.blit(exitIMG, exitHITBOX)
         if time.time() >= appearin:
             if not appeared:
-                goldpos = [rd.randint(0, width), rd.randint(0, height)]
-                goldangle += 2 * dt
-                goldrotation = 45 * sin(goldangle)
-                randomscale = rd.randint(120, 200)
-                randomscale = [randomscale, randomscale]
-                transformedgoldmewo = py.transform.scale(goldmewo, randomscale)
-                goldmewoHITBOX = transformedgoldmewo.get_rect(center=goldpos)
-                screen.blit(transformedgoldmewo, goldmewoHITBOX)
+                goldsize = rd.randint(120, 200)
+                goldpos = [
+                    rd.randint(goldsize // 2, width - goldsize // 2),
+                    rd.randint(goldsize // 2, height - goldsize // 2),
+                ]
+                goldscaled = py.transform.scale(goldmewo, (goldsize, goldsize))
+                goldangle = 0
                 goldwait = time.time() + rd.randint(5, 15)
                 appeared = True
-            else:
-                goldangle += 1 * dt
-                goldrotation = 20 * sin(goldangle)
-                transformedgoldmewo = py.transform.scale(goldmewo, randomscale)
-                transformedgoldmewo = py.transform.rotate(
-                    transformedgoldmewo, goldrotation
-                )
-                goldmewoHITBOX = transformedgoldmewo.get_rect(center=goldpos)
-                screen.blit(transformedgoldmewo, goldmewoHITBOX)
-                if goldclicked:
-                    goldclicked = False
-                    appeared = False
-                    appearin = time.time() + rd.randint(180, 600)
-                    eval("meow" + str(rd.randint(1, 3)) + ".play()")
-                    choice = rd.randint(1, 2)
-                    if choice == 1:
-                        if cps > 1:
-                            money += round(rd.uniform(200 * cps, 600 * cps))
-                        else:
-                            money += round(rd.uniform(200, 600))
-                    else:
-                        buffed = True
-                        buff = time.time() + rd.randint(180, 600)
 
-            if time.time() >= goldwait and not goldclicked:
-                appearin = time.time() + rd.randint(180, 600)
+            goldangle += dt
+            transformedgoldmewo = py.transform.rotate(goldscaled, 20 * sin(goldangle))
+            goldmewoHITBOX = transformedgoldmewo.get_rect(center=goldpos)
+            screen.blit(transformedgoldmewo, goldmewoHITBOX)
+
+            if goldclicked:
+                goldclicked = False
                 appeared = False
+                appearin = time.time() + rd.randint(180, 600)
+                eval("meow" + str(rd.randint(1, 3)) + ".play()")
+                choice = rd.randint(1, 2)
+                if choice == 1:
+                    if cps > 1:
+                        money += round(rd.uniform(200 * cps, 600 * cps))
+                    else:
+                        money += round(rd.uniform(200, 600))
+                else:
+                    buffed = True
+                    buff = time.time() + rd.randint(180, 600)
+            elif time.time() >= goldwait:
+                appeared = False
+                appearin = time.time() + rd.randint(180, 600)
 
         # click handling
         for i in range(len(text) - 1, -1, -1):
             ctext = font.render(text[i], True, (100, 100, 0))
             ctextrect = ctext.get_rect(center=(textX[i], textY[i]))
             screen.blit(ctext, ctextrect)
-            textX[i] += textXCH[i]
-            textY[i] += textYCH[i]
-            textYCH[i] += gravity
-            if abs(textXCH[i]) <= 0.5:
+            textX[i] += textXCH[i] * dt
+            textY[i] += textYCH[i] * dt
+            textYCH[i] += gravity * dt
+            if abs(textXCH[i]) <= drag * dt:
                 textXCH[i] = 0
             elif textXCH[i] > 0:
-                textXCH[i] -= 0.5
+                textXCH[i] -= drag * dt
             else:
-                textXCH[i] += 0.5
+                textXCH[i] += drag * dt
 
             if textY[i] > height:
                 text.pop(i)
@@ -759,7 +812,6 @@ def maingame():
 # store
 def store():
     global money
-    global cps
     global STORE_SCROLL
 
     click2.play()
@@ -776,7 +828,14 @@ def store():
         events = py.event.get()
         for event in events:
             if event.type == py.QUIT:
-                return True
+                return False
+            elif event.type in (
+                py.APP_WILLENTERBACKGROUND,
+                py.APP_DIDENTERBACKGROUND,
+                py.APP_TERMINATING,
+            ):
+                save_game()
+
             if event.type == py.MOUSEWHEEL:
                 STORE_SCROLL += event.y * 60
             elif event.type == py.KEYDOWN:
@@ -789,6 +848,7 @@ def store():
             elif event.type == py.MOUSEBUTTONDOWN and event.button == 1:
                 if storeHITBOX.collidepoint(event.pos):
                     return
+
                 dragging = True
                 drag_start = event.pos[1]
                 drag_base = STORE_SCROLL
@@ -836,13 +896,5 @@ if __name__ == "__main__":
     try:
         maingame()
     finally:
-        save["main"]["cps"] = cps
-        save["main"]["money"] = money
-        save["main"]["mewoPOWER"] = mewoPOWER
-        for i in storeItems:
-            save["store"][i.name] = i.amount
-            save["store"][i.name + "_price"] = i.price
-        for i in achLIST:
-            save["achievment"][i.achNAME] = i.gained
-        save_game(save)
+        save_game()
     py.quit()

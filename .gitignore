@@ -1,9 +1,16 @@
+# files u wont need
 __pycache__/
+*.pyc
 build/
 dist/
-main.spec
 .buildozer/
 .venv/
+bin/
+
+# Release signing stuff
+.env
+*.keystore
+*.jks
 
 # I dont want you getting my save...
 save.toml
